@@ -1,6 +1,6 @@
 /* eslint-disable */
 // ───────────────────────────────────────────────────────────────
-//  goraesa 로컬 서버 — 정적 파일 서빙 + OpenAI 프록시(/api/ai)
+//  harim 로컬 서버 — 정적 파일 서빙 + OpenAI 프록시(/api/ai)
 //
 //  왜 필요한가: OpenAI는 브라우저에서의 직접 호출(CORS)을 막습니다.
 //  같은 출처(same-origin)의 이 서버가 대신 호출하면 CORS 없이 동작하고,
@@ -133,5 +133,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`goraesa server (static + /api/ai) → http://localhost:${PORT}`);
+  console.log(`harim server (static + /api/ai) → http://localhost:${PORT}`);
 });

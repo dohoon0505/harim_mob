@@ -7,8 +7,8 @@
 //  config.jsx 의 proxyEndpoint 가 있으면 키 대신 그 백엔드로 호출(키 은닉).
 // ───────────────────────────────────────────────────────────────
 (function () {
-  const CFG = () => window.GORAESA_AI_CONFIG || {};
-  const SS_KEY = "goraesa_openai_key";
+  const CFG = () => window.HARIM_AI_CONFIG || {};
+  const SS_KEY = "harim_openai_key";
 
   function getApiKey() {
     const c = CFG();
@@ -131,5 +131,5 @@
     }
   }
 
-  window.GORAESA_AI = { extractInvitation, getApiKey, setSessionKey, hasKey };
+  window.HARIM_AI = { extractInvitation, getApiKey, setSessionKey, hasKey };
 })();

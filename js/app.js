@@ -10,12 +10,15 @@
   // ---------- 상수 ----------
   const PHONE = (window.SITE_INFO && window.SITE_INFO.phone) || "010-0000-0000";
   const PHONE_HREF = "tel:" + PHONE.replace(/[^\d]/g, "");
-  const APPLICANT_KEY = "goraesa_applicant";
+  const APPLICANT_KEY = "harim_applicant";
   const APPLICANT_TTL = 30 * 24 * 60 * 60 * 1000; // 30일
 
   // ---------- 유틸 ----------
   const fmt = (n) => n.toLocaleString("ko-KR");
   const isFramedImg = (src) => /tab[123]_/.test(src || "");
+  // 가격 표시 (가격 0/미정 → "가격 문의")
+  const priceNode = (cls, p) => (p && p > 0) ? el("div", { class: cls }, fmt(p), el("span", { class: "won" }, "원")) : el("div", { class: cls }, "가격 문의");
+  const seedLabel = (it) => (it.price && it.price > 0) ? (it.name + " (" + fmt(it.price) + "원)") : it.name;
 
   function loadApplicant() {
     try {
@@ -99,8 +102,9 @@
       if (h === "order" && loadApplicant()) return "order";
       return "home";
     })(),
-    activeTab: "tab1",
+    activeTab: "tab4",
     orderSeed: null,
+    pendingIntakeData: null,
     applicant: loadApplicant(),
   };
   let pendingRoute = null;
@@ -109,7 +113,7 @@
 
   // ---------- 테마 (브랜드색/다크 — 기본값, 현행 라이브와 동일) ----------
   function applyTheme() {
-    const brand = "#4F46E5", dark = false;
+    const brand = "#ED1C24", dark = false;
     const root = document.documentElement;
     root.style.setProperty("--p-indigo-500", brand);
     root.style.setProperty("--p-indigo-600", shade(brand, -0.12));
@@ -160,7 +164,7 @@
   }
   function buildAppBar() {
     appbarBackBtnHost = el("span");
-    appbarTitleEl = el("div", { class: "pagetitle" }, "경조사 지원센터");
+    appbarTitleEl = el("div", { class: "pagetitle" }, "하림그룹 경조화환");
     appbarEl = el("div", { class: "appbar" },
       appbarBackBtnHost,
       appbarTitleEl,
@@ -175,7 +179,7 @@
     if (S.route === "items") { title = "상품목록"; onBack = () => go("home"); }
     if (S.route === "order") { title = "주문하기"; onBack = () => go("home"); }
     if (S.route === "history") { title = "신청내역"; onBack = () => go("home"); }
-    appbarTitleEl.textContent = title || "경조사 지원센터";
+    appbarTitleEl.textContent = title || "하림그룹 경조화환";
     appbarBackBtnHost.innerHTML = "";
     if (onBack) appbarBackBtnHost.appendChild(el("button", { class: "iconbtn", onClick: onBack, "aria-label": "뒤로 가기" }, I.Back()));
   }
@@ -207,7 +211,7 @@
   // ---------- 신청인 카드 ----------
   function buildApplicantCard(applicant, onEdit) {
     if (!applicant) return null;
-    const meta = [applicant.dept, applicant.position].filter(Boolean).join(" · ");
+    const meta = [applicant.company, applicant.dept, applicant.position].filter(Boolean).join(" · ");
     return el("section", { class: "applicant-card" },
       el("div", { class: "applicant-card-head" },
         el("span", { class: "applicant-card-label" }, I.User({ size: 13, strokeWidth: 2.2 }), " 신청인 정보"),
@@ -261,22 +265,21 @@
     heroSubhead.split(/\r?\n/).forEach((line, i, arr) => { heroP.appendChild(document.createTextNode(line)); if (i < arr.length - 1) heroP.appendChild(el("br")); });
     const heroSec = el("section", { class: "hero" }, h2, heroP, buildApplicantCard(S.applicant, openEditApplicant));
 
-    // categories
-    const catlist = el("div", { class: "catlist" });
-    window.CATEGORIES.forEach((c) => {
-      const count = window.SECTIONS[c.id].reduce((a, s) => a + s.items.length, 0);
-      catlist.appendChild(el("button", { class: "cat", onClick: () => openCat(c.id) },
-        el("span", { class: "thumb" }, el("img", { src: c.photo, alt: c.name })),
-        el("span", { class: "cat-text" },
-          el("div", { class: "cat-blurb" }, c.blurb),
-          el("div", { class: "cat-name" }, el("span", { class: "cat-name-label" }, c.name), el("span", { class: "cat-count" }, count + "개"))
-        ),
-        el("span", { class: "arrow" }, I.Arrow({ size: 20 }))
-      ));
-    });
+    // 홈 액션 카드 (부고장·청첩장 간편접수 + 화환 상품 둘러보기)
+    const startIntake = (type) => openQuickIntake(type, (data) => { S.pendingIntakeData = { type: type, data: data }; go("order"); });
+    const intakeGrid = el("div", { class: "home-intake" },
+      el("button", { type: "button", class: "intake-card intake-obituary", style: { backgroundImage: "url('img/intake_obituary.jpg')" }, onClick: () => startIntake("obituary") },
+        el("span", { class: "intake-card-label" }, "부고장 간편접수"),
+        el("span", { class: "intake-card-arrow" }, I.Arrow({ size: 20 }))),
+      el("button", { type: "button", class: "intake-card intake-wedding", style: { backgroundImage: "url('img/intake_wedding.jpg')" }, onClick: () => startIntake("wedding") },
+        el("span", { class: "intake-card-label" }, "청첩장 간편접수"),
+        el("span", { class: "intake-card-arrow" }, I.Arrow({ size: 20 }))));
+    const browseBtn = el("button", { type: "button", class: "home-browse", onClick: () => go("items") },
+      el("span", { class: "home-browse-label" }, "전체상품 둘러보기"),
+      el("span", { class: "home-browse-arrow" }, I.Arrow({ size: 20 })));
     const catSec = el("section", { class: "section" },
       el("div", { class: "section-head" }, el("h3", null, "어떤 경조사가 발생했나요?"), el("span", { class: "meta" }, "상황에 따른 상품선택")),
-      catlist);
+      intakeGrid, browseBtn);
 
     // how
     const steps = [
@@ -292,10 +295,9 @@
         el("div", { class: "how-card" }, el("h4", null, s.t), el("p", null, s.d))
       ));
     });
-    const howBtn = el("button", { class: "btn", style: { marginTop: "20px" }, onClick: () => go("items") }, I.List({ size: 18, strokeWidth: 2.2 }), "상품 목록 둘러보기");
     const howSec = el("section", { class: "section how-section" },
       el("div", { class: "section-head" }, el("h3", null, "경조사 지원 신청방법"), el("p", { class: "how-sub" }, "전화 없이도, 누구나 3분이면 주문을 완성할 수 있어요.")),
-      timeline, howBtn);
+      timeline);
 
     const root = el("div", null, heroSec, el("div", { style: { display: "none" } }), catSec, howSec);
 
@@ -317,32 +319,31 @@
   function buildItemsScreen() {
     const cat = window.CATEGORIES.find((c) => c.id === S.activeTab);
     const groups = window.SECTIONS[S.activeTab];
-    const catIcons = { leaf: I.Leaf, basket: I.Basket, orchid: I.Orchid, wreath: I.Wreath, memorial: I.Memorial };
 
     const tabScroll = el("div", { class: "tabbar-scroll" });
     window.CATEGORIES.forEach((c) => {
       tabScroll.appendChild(el("button", { "data-tab": c.id, class: "tab " + (c.id === S.activeTab ? "on" : ""), onClick: () => { S.activeTab = c.id; renderScreen(); } }, c.name));
     });
     const root = el("div", null,
-      el("div", { class: "tabbar" }, tabScroll),
-      el("div", { class: "cat-banner" }, el("img", { src: cat.banner, alt: cat.name })));
+      el("div", { class: "tabbar" }, tabScroll));
 
     groups.forEach((g) => {
-      const CatIc = catIcons[cat.icon];
       const products = el("div", { class: "products" });
       g.items.forEach((it) => {
         products.appendChild(el("button", { class: "product", onClick: () => openItemSheet(Object.assign({}, it, { category: cat.name, group: g.title })) },
           el("div", { class: "product-img" + (isFramedImg(it.img) ? " framed" : "") },
-            el("span", { class: "tag" }, g.tag),
             el("img", { src: it.img, alt: it.name, loading: "lazy" })),
           el("div", { class: "product-body" },
             el("div", { class: "product-name" }, it.name),
-            el("div", { class: "product-price" }, fmt(it.price), el("span", { class: "won" }, "원")))
+            it.desc ? el("div", { class: "product-desc" }, it.desc) : null,
+            priceNode("product-price", it.price))
         ));
       });
+      if (g.banner) root.appendChild(el("div", { class: "cat-banner group-banner" }, el("img", { src: g.banner, alt: g.title })));
       root.appendChild(el("section", { class: "group" },
-        el("span", { class: "group-kicker" }, CatIc({ size: 12, strokeWidth: 2 }), " ", g.tag),
+        el("span", { class: "group-kicker" }, g.tag),
         el("h3", null, el("span", { class: "light" }, g.kicker), g.title),
+        g.note ? el("p", { class: "group-note" }, g.note) : null,
         products));
     });
 
@@ -478,26 +479,74 @@
     });
   }
 
+  // ---------- 커스텀 드롭다운 (네이티브 select 대체 · 스타일 가능) ----------
+  function createDropdown(config) {
+    const options = config.options || [];
+    let value = (config.value != null && config.value !== "") ? String(config.value) : "";
+    let open = false;
+    const labelFor = (v) => { const o = options.find((x) => String(x[0]) === String(v)); return o ? o[1] : ""; };
+    const valText = el("span", { class: "dd-val" });
+    const chevron = el("span", { class: "dd-chevron", html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' });
+    const menu = el("div", { class: "dd-menu", role: "listbox" });
+    const trigger = el("button", { type: "button", class: "dd-trigger", "aria-haspopup": "listbox", "aria-label": config.placeholder || "선택", onClick: () => toggle() }, valText, chevron);
+    const root = el("div", { class: "dd" + (config.dropUp ? " up" : "") }, trigger, menu);
+    function renderTrigger() {
+      const has = value !== "";
+      valText.textContent = has ? labelFor(value) : (config.placeholder || "선택");
+      valText.className = "dd-val" + (has ? "" : " placeholder");
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    function renderMenu() {
+      menu.innerHTML = "";
+      options.forEach((o) => {
+        const sel = String(o[0]) === value;
+        const opt = el("button", { type: "button", class: "dd-opt" + (sel ? " sel" : ""), role: "option", onClick: () => { value = String(o[0]); renderTrigger(); close(); if (config.onChange) config.onChange(value); } }, el("span", null, o[1]));
+        if (sel) opt.appendChild(I.Check({ size: 15, strokeWidth: 2.6 }));
+        menu.appendChild(opt);
+      });
+    }
+    function onDoc(e) { if (!root.contains(e.target)) close(); }
+    function open_() { if (open) return; open = true; root.classList.add("open"); renderMenu(); renderTrigger(); setTimeout(() => document.addEventListener("click", onDoc), 0); const s = menu.querySelector(".dd-opt.sel"); if (s && s.scrollIntoView) s.scrollIntoView({ block: "nearest" }); }
+    function close() { if (!open) return; open = false; root.classList.remove("open"); renderTrigger(); document.removeEventListener("click", onDoc); }
+    function toggle() { open ? close() : open_(); }
+    renderTrigger();
+    return { node: root, getValue: () => value, setValue: (v) => { value = (v != null && v !== "") ? String(v) : ""; renderTrigger(); } };
+  }
+
   // ---------- 시트: DateTimePicker ----------
-  function openDateTimePicker(initialDate, initialTime, onConfirm) {
+  function openDateTimePicker(initialDate, initialTime, onConfirm, opts) {
+    const pickerTitle = (opts && opts.title) || "배송일시 선택";
+    const pad = (n) => String(n).padStart(2, "0");
     mountOverlay((holder, close) => {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       let view = (function () { const d = initialDate ? new Date(initialDate) : today; return new Date(d.getFullYear(), d.getMonth(), 1); })();
       let date = initialDate || "";
-      let time = initialTime || "";
-
-      const TIMES = [];
-      for (let h = 9; h <= 18; h++) { TIMES.push(String(h).padStart(2, "0") + ":00"); TIMES.push(String(h).padStart(2, "0") + ":30"); }
+      let hourVal = "", minVal = "";
+      if (initialTime && /^\d{1,2}:\d{2}$/.test(initialTime)) { const t = initialTime.split(":"); hourVal = String(+t[0]); minVal = String(+t[1]); }
+      const timeStr = () => (hourVal !== "" && minVal !== "") ? (pad(hourVal) + ":" + pad(minVal)) : "";
 
       const calTitle = el("div", { class: "cal-title" });
       const grid = el("div", { class: "cal-grid" });
-      const timeGrid = el("div", { class: "time-grid" });
-      const confirmBtn = el("button", { class: "btn", onClick: () => { if (date && time) { onConfirm({ date: date, time: time }); close(); } } }, "선택 완료");
+      const summaryEl = el("div", { class: "dtp-summary" });
+      const confirmBtn = el("button", { class: "btn", onClick: () => { const t = timeStr(); if (date && t) { onConfirm({ date: date, time: t }); close(); } } }, "선택 완료");
 
-      function syncConfirm() { confirmBtn.disabled = !(date && time); }
+      // 시 / 분(10분 단위) 커스텀 드롭다운
+      const hourOpts = []; for (let h = 9; h <= 18; h++) hourOpts.push([h, pad(h) + "시"]);
+      const minOpts = [0, 10, 20, 30, 40, 50].map((m) => [m, pad(m) + "분"]);
+      const ddH = createDropdown({ value: hourVal, options: hourOpts, placeholder: "시", dropUp: true, onChange: (v) => { hourVal = v; sync(); } });
+      const ddMi = createDropdown({ value: minVal, options: minOpts, placeholder: "분", dropUp: true, onChange: (v) => { minVal = v; sync(); } });
+
+      function sync() {
+        const t = timeStr();
+        confirmBtn.disabled = !(date && t);
+        if (date && t) summaryEl.textContent = formatDateKR(date) + " · " + t;
+        else if (date) summaryEl.textContent = formatDateKR(date) + " · 시간을 선택하세요";
+        else summaryEl.textContent = "날짜와 시간을 선택해 주세요";
+        summaryEl.className = "dtp-summary" + ((date && t) ? " on" : "");
+      }
       function renderCal() {
         const year = view.getFullYear(), month = view.getMonth();
-        calTitle.textContent = year + "." + String(month + 1).padStart(2, "0");
+        calTitle.textContent = year + "." + pad(month + 1);
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const cells = [];
@@ -513,43 +562,44 @@
           const btn = el("button", {
             class: "cal-cell " + (sel ? "sel " : "") + (disabled ? "disabled " : "") + (isToday && !sel ? "today " : ""),
             "data-dow": d.getDay(), disabled: disabled,
-            onClick: () => { if (!disabled) { date = fmtDate(d); renderCal(); syncConfirm(); } }
+            onClick: () => { if (!disabled) { date = fmtDate(d); renderCal(); sync(); } }
           }, String(d.getDate()));
           grid.appendChild(btn);
         });
       }
-      function renderTimes() {
-        timeGrid.innerHTML = "";
-        TIMES.forEach((t) => timeGrid.appendChild(el("button", { class: "time-cell " + (t === time ? "sel" : ""), onClick: () => { time = t; renderTimes(); syncConfirm(); } }, t)));
-      }
-      renderCal(); renderTimes(); syncConfirm();
+      renderCal(); sync();
 
       const dow = ["일", "월", "화", "수", "목", "금", "토"];
       const dowRow = el("div", { class: "cal-grid cal-dow" });
       dow.forEach((d, i) => dowRow.appendChild(el("span", { class: "cal-dow-lbl " + (i === 0 ? "sun" : i === 6 ? "sat" : "") }, d)));
 
       holder.appendChild(el("div", { class: "scrim", onClick: close }));
-      holder.appendChild(el("div", { class: "sheet sheet-tall", role: "dialog", "aria-modal": "true", "aria-label": "배송일시 선택" },
+      holder.appendChild(el("div", { class: "sheet sheet-tall", role: "dialog", "aria-modal": "true", "aria-label": pickerTitle },
         el("div", { class: "sheet-handle" }),
-        el("div", { class: "sheet-head" }, el("h4", null, "배송일시 선택"), el("button", { class: "sheet-close", onClick: close, "aria-label": "닫기" }, I.Close({ size: 18 }))),
+        el("div", { class: "sheet-head" }, el("h4", null, pickerTitle), el("button", { class: "sheet-close", onClick: close, "aria-label": "닫기" }, I.Close({ size: 18 }))),
         el("div", { class: "sheet-body", style: { paddingBottom: "8px" } },
+          summaryEl,
+          el("div", { class: "cal-section-title" }, "날짜 선택"),
           el("div", { class: "cal-head" },
             el("button", { class: "cal-nav", onClick: () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderCal(); }, "aria-label": "이전 달" }, I.Back({ size: 18 })),
             calTitle,
             el("button", { class: "cal-nav", onClick: () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderCal(); }, "aria-label": "다음 달" }, I.Arrow({ size: 18 }))),
           dowRow, grid,
-          el("div", { class: "cal-section" }, el("div", { class: "cal-section-title" }, "시간 선택"), timeGrid)),
+          el("div", { class: "cal-section" }, el("div", { class: "cal-section-title" }, "시간 선택"),
+            el("div", { class: "dtp-time" }, ddH.node, ddMi.node))),
         el("div", { class: "sheet-foot" }, el("button", { class: "btn-secondary", onClick: close }, "취소"), confirmBtn)));
     });
   }
 
   // ---------- 시트: QuickIntake ----------
+  // 백엔드(간편접수 API) 연결 전까지 false — '정보 가져오기' 시 예시 데이터로 바로 진행
+  const INTAKE_API_ENABLED = false;
   function openQuickIntake(type, onResult) {
     const isOb = type === "obituary";
     const title = isOb ? "부고장 간편접수" : "청첩장 간편접수";
     const targetName = isOb ? "부고장" : "청첩장";
     const productName = isOb ? "근조화환" : "축하화환";
-    let busy = false, needKey = !(window.GORAESA_AI && window.GORAESA_AI.hasKey());
+    let busy = false, needKey = INTAKE_API_ENABLED ? !(window.HARIM_AI && window.HARIM_AI.hasKey()) : false;
     let ctrl = null;
 
     mountOverlay((holder, close) => {
@@ -585,17 +635,24 @@
       };
       async function submit() {
         setErr("");
-        if (!window.GORAESA_AI) { setErr("AI 모듈을 불러오지 못했어요."); return; }
+        // 백엔드 연결 전: API 호출 없이 예시 데이터로 바로 진행
+        if (!INTAKE_API_ENABLED) {
+          const dummy = isOb
+            ? { deliveryAddress: "서울 중랑구 신내로 156 서울의료원 장례식장 105호실", recipient: "상주 홍길동 / 010-0000-0000" }
+            : { deliveryAddress: "서울 강남구 테헤란로 1 그랜드웨딩홀 3층 그랜드볼룸", recipient: "신랑 김민준 · 신부 이서연 / 010-0000-0000", ceremonyDateTime: "2026-08-15T11:00" };
+          onResult(dummy); close(); return;
+        }
+        if (!window.HARIM_AI) { setErr("AI 모듈을 불러오지 못했어요."); return; }
         if (needKey) {
           if (!keyVal.trim()) { setErr("OpenAI API 키를 입력해주세요."); return; }
-          window.GORAESA_AI.setSessionKey(keyVal.trim());
+          window.HARIM_AI.setSessionKey(keyVal.trim());
           needKey = false; if (keyField.parentNode) keyField.parentNode.removeChild(keyField);
         }
         if (!urlVal.trim()) { setErr(targetName + " 링크를 입력해주세요."); return; }
         setBusy(true);
         ctrl = new AbortController();
         try {
-          const data = await window.GORAESA_AI.extractInvitation({ type: type, url: urlVal.trim(), signal: ctrl.signal });
+          const data = await window.HARIM_AI.extractInvitation({ type: type, url: urlVal.trim(), signal: ctrl.signal });
           onResult(data); close();
         } catch (e) {
           const msg = String((e && e.message) || e);
@@ -617,23 +674,31 @@
   }
 
   // ---------- 시트: ProductPicker ----------
-  function openProductPicker(categoryId, onPick) {
+  // categoryId 가 없거나 SECTIONS에 없으면 전체 카테고리 상품을 모두 표시.
+  // opts.groupKey 가 있으면 해당 그룹(예: 축하/근조)만 표시.
+  function openProductPicker(categoryId, onPick, opts) {
+    const groupKey = opts && opts.groupKey;
     mountOverlay((holder, close) => {
-      const cat = (window.CATEGORIES || []).find((c) => c.id === categoryId);
-      const sections = (window.SECTIONS && window.SECTIONS[categoryId]) || [];
+      const single = !!(categoryId && window.SECTIONS && window.SECTIONS[categoryId]);
+      const cat = single ? (window.CATEGORIES || []).find((c) => c.id === categoryId) : null;
+      let sections;
+      if (single) sections = window.SECTIONS[categoryId] || [];
+      else { sections = []; (window.CATEGORIES || []).forEach((c) => { ((window.SECTIONS && window.SECTIONS[c.id]) || []).forEach((s) => sections.push(s)); }); }
+      if (groupKey) sections = sections.filter((s) => s.key === groupKey);
+      const headTitle = (groupKey && sections[0] ? sections[0].title : (cat ? cat.name : "상품")) + " 선택";
       const body = el("div", { class: "sheet-body" });
       sections.forEach((sec) => {
         const grid = el("div", { class: "pp-grid" });
-        sec.items.forEach((it) => grid.appendChild(el("button", { type: "button", class: "pp-item", onClick: () => { onPick(it.name + " (" + fmt(it.price) + "원)"); close(); } },
+        sec.items.forEach((it) => grid.appendChild(el("button", { type: "button", class: "pp-item", onClick: () => { onPick(seedLabel(it)); close(); } },
           el("div", { class: "pp-thumb" }, el("img", { src: it.img, alt: it.name, loading: "lazy" })),
-          el("div", { class: "pp-meta" }, el("div", { class: "pp-name" }, it.name), el("div", { class: "pp-price" }, fmt(it.price), el("span", { class: "won" }, "원"))),
+          el("div", { class: "pp-meta" }, el("div", { class: "pp-name" }, it.name), priceNode("pp-price", it.price)),
           I.Arrow({ size: 16 }))));
         body.appendChild(el("div", { class: "pp-section" }, el("div", { class: "pp-section-title" }, sec.title), grid));
       });
       holder.appendChild(el("div", { class: "scrim", onClick: close }));
-      holder.appendChild(el("div", { class: "sheet sheet-tall", role: "dialog", "aria-modal": "true", "aria-label": (cat ? cat.name : "상품") + " 선택" },
+      holder.appendChild(el("div", { class: "sheet sheet-tall", role: "dialog", "aria-modal": "true", "aria-label": headTitle },
         el("div", { class: "sheet-handle" }),
-        el("div", { class: "sheet-head" }, el("h4", null, (cat ? cat.name : "상품") + " 선택"), el("button", { class: "sheet-close", onClick: close, "aria-label": "닫기" }, I.Close({ size: 18 }))),
+        el("div", { class: "sheet-head" }, el("h4", null, headTitle), el("button", { class: "sheet-close", onClick: close, "aria-label": "닫기" }, I.Close({ size: 18 }))),
         body));
     });
   }
@@ -651,8 +716,8 @@
           el("div", { class: "sheet-meta" },
             el("div", { style: { display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--sm-content-tertiary)" } }, el("span", null, item.category), el("span", null, "·"), el("span", null, item.group)),
             el("div", { class: "name" }, item.name),
-            el("div", { class: "price" }, fmt(item.price), el("span", { class: "won" }, "원")),
-            el("div", { class: "ribbon" }, el("div", null, "실제 상품은 시즌과 재고에 따라 색감이나 구성이 조금 달라질 수 있어요. 정확한 상품은 주문 전 전화로 확인해 주세요.")))),
+            priceNode("price", item.price),
+            item.desc ? el("div", { class: "sheet-spec" }, el("div", { class: "sheet-spec-title" }, "표준 사양"), el("div", null, item.desc)) : null)),
         el("div", { class: "sheet-foot" },
           el("button", { class: "btn-secondary", onClick: close }, "닫기"),
           el("button", { class: "btn", onClick: () => { close(); orderProduct(item); } }, I.Edit({ size: 18, strokeWidth: 2 }), " 이 상품으로 주문하기"))));
@@ -660,13 +725,28 @@
   }
 
   // ---------- 모달: 신청인 정보 ----------
+  const AFFILIATE_ETC = "__etc__";
   function openApplicantModal(initial, onSave, onClose) {
     let closedVia = false;
+    const affiliates = window.AFFILIATES || [];
     const api = mountOverlay((holder, close) => {
       let name = (initial && initial.name) || "", contact = (initial && initial.contact) || "";
       let dept = (initial && initial.dept) || "", position = (initial && initial.position) || "";
-      const saveBtn = el("button", { class: "btn", onClick: () => { if (!(name.trim() && contact.trim())) return; closedVia = true; close(); onSave({ name: name.trim(), contact: contact.trim(), dept: dept.trim(), position: position.trim() }); } }, "저장");
-      function sync() { saveBtn.disabled = !(name.trim() && contact.trim()); }
+      const initCompany = (initial && initial.company) || "";
+      const isKnownCompany = initCompany && affiliates.indexOf(initCompany) !== -1;
+      let companySel = initCompany ? (isKnownCompany ? initCompany : AFFILIATE_ETC) : "";
+      let companyEtc = isKnownCompany ? "" : initCompany;
+      const currentCompany = () => (companySel === AFFILIATE_ETC ? companyEtc.trim() : companySel);
+      const companyValid = () => !!companySel && (companySel !== AFFILIATE_ETC || companyEtc.trim().length > 0);
+      const saveBtn = el("button", { class: "btn", onClick: () => { if (!(name.trim() && contact.trim() && companyValid())) return; closedVia = true; close(); onSave({ company: currentCompany(), name: name.trim(), contact: contact.trim(), dept: dept.trim(), position: position.trim() }); } }, "저장");
+      function sync() { saveBtn.disabled = !(name.trim() && contact.trim() && companyValid()); }
+      // 계열사 선택(드롭다운) + 기타 직접입력
+      const fldEtc = el("input", { type: "text", value: companyEtc, placeholder: "계열사명을 직접 입력하세요", onInput: (e) => { companyEtc = e.target.value; sync(); } });
+      const etcField = el("label", { class: "qi-field" }, el("span", { class: "qi-field-lbl" }, "계열사명 직접입력"), fldEtc);
+      const companyOpts = affiliates.map((a) => [a, a]);
+      companyOpts.push([AFFILIATE_ETC, "기타 (직접입력)"]);
+      const ddCompany = createDropdown({ value: companySel, options: companyOpts, placeholder: "계열사를 선택하세요", onChange: (v) => { companySel = v; etcField.style.display = v === AFFILIATE_ETC ? "" : "none"; sync(); } });
+      etcField.style.display = companySel === AFFILIATE_ETC ? "" : "none";
       const fldDept = el("input", { type: "text", value: dept, placeholder: "영업본부", onInput: (e) => { dept = e.target.value; } });
       const fldPos = el("input", { type: "text", value: position, placeholder: "대리", onInput: (e) => { position = e.target.value; } });
       const fldName = el("input", { type: "text", value: name, placeholder: "홍길동", onInput: (e) => { name = e.target.value; sync(); } });
@@ -679,6 +759,8 @@
         el("div", { class: "sheet-head" }, el("h4", null, "신청인 정보"), closeBtn),
         el("div", { class: "sheet-body" },
           el("p", { class: "qi-desc" }, "신청인 정보확인 및 배송사진 전송을 위해 신청인 정보를 수집합니다."),
+          el("div", { class: "qi-field" }, el("span", { class: "qi-field-lbl" }, "계열사"), ddCompany.node),
+          etcField,
           el("label", { class: "qi-field" }, el("span", { class: "qi-field-lbl" }, "부서"), fldDept),
           el("label", { class: "qi-field" }, el("span", { class: "qi-field-lbl" }, "직책"), fldPos),
           el("label", { class: "qi-field" }, el("span", { class: "qi-field-lbl" }, "성함"), fldName),
@@ -698,11 +780,11 @@
   function buildOrderScreen() {
     const form = { product: S.orderSeed || "", deliveryDate: "", deliveryTime: "", address: "", recipient: "", sender: "", message: "" };
     const fields = [
-      { id: "product", label: "상품 분류 및 이름", hint: "EX) 개업화분 뱅갈나무", icon: I.Tag },
-      { id: "address", label: "보내는 장소(상세주소)", hint: "EX) 부산 동구 고관로29번길 8 솥뚜껑삼겹살", icon: I.Pin, multiline: true },
-      { id: "recipient", label: "받는 분 정보(성함, 연락처)", hint: "EX) 홍길동, 010-0000-0000", icon: I.User },
-      { id: "sender", label: "리본문구 좌측(보내는분)", hint: "EX) 00컴퍼니 대표이사 홍길동", icon: I.Edit, recent: true },
-      { id: "message", label: "리본문구 우측(경조사어)", hint: "EX) 개업을 진심으로 축하합니다", icon: I.Heart, guide: true },
+      { id: "product", label: "상품 분류 및 이름", hint: "100% 생화 근조화환(기본)", icon: I.Tag },
+      { id: "address", label: "보내는 장소(상세주소)", hint: "서울 중랑구 신내로 156 서울의료원 장례식장 105호실", icon: I.Pin, multiline: true },
+      { id: "recipient", label: "받는 분 성함", hint: "상주 홍길동 / 신부측 혼주 홍길동 등", icon: I.User },
+      { id: "sender", label: "리본문구 좌측(보내는분)", hint: "(주)하림지주 품질관리팀 일동", icon: I.Edit, recent: true },
+      { id: "message", label: "리본문구 우측(경조사어)", hint: "삼가 故人의 冥福을 빕니다", icon: I.Heart, guide: true },
     ];
     const total = fields.length + 1;
     const refs = {}; // id → { container, input, iconSlot }
@@ -752,21 +834,50 @@
     function setFieldValue(id, value) {
       form[id] = value;
       const r = refs[id];
+      if (r.render) { r.render(); recompute(); return; }
       if (r.input) r.input.value = value;
       r.container.className = "field " + (value.trim().length > 0 ? "done" : "");
       if (r.iconSlot) { r.iconSlot.innerHTML = ""; r.iconSlot.appendChild(value.trim().length > 0 ? I.Check({ size: 16, strokeWidth: 2.4 }) : r.icon({ size: 16 })); }
       recompute();
     }
     const formEl = el("form", { class: "form", onSubmit: (e) => { e.preventDefault(); send(); } });
-    // 간편접수 버튼
-    formEl.appendChild(el("div", { class: "quick-intake" },
-      el("button", { type: "button", class: "qi-btn qi-obituary", onClick: () => openQuickIntake("obituary", (data) => handleIntake("obituary", data)) }, I.Memorial({ size: 18, strokeWidth: 1.9 }), " 부고장 간편접수"),
-      el("button", { type: "button", class: "qi-btn qi-wedding", onClick: () => openQuickIntake("wedding", (data) => handleIntake("wedding", data)) }, I.Wreath({ size: 18, strokeWidth: 1.9 }), " 청첩장 간편접수")));
+    // 간편접수 카드 (홈 카드와 동일 스타일)
+    formEl.appendChild(el("div", { class: "home-intake" },
+      el("button", { type: "button", class: "intake-card intake-obituary", style: { backgroundImage: "url('img/intake_obituary.jpg')" }, onClick: () => openQuickIntake("obituary", (data) => handleIntake("obituary", data)) },
+        el("span", { class: "intake-card-label" }, "부고장 간편접수"),
+        el("span", { class: "intake-card-arrow" }, I.Arrow({ size: 20 }))),
+      el("button", { type: "button", class: "intake-card intake-wedding", style: { backgroundImage: "url('img/intake_wedding.jpg')" }, onClick: () => openQuickIntake("wedding", (data) => handleIntake("wedding", data)) },
+        el("span", { class: "intake-card-label" }, "청첩장 간편접수"),
+        el("span", { class: "intake-card-arrow" }, I.Arrow({ size: 20 })))));
     formEl.appendChild(dtFieldContainer);
 
     fields.forEach((f, i) => {
       const value = form[f.id];
       const isDone = value.trim().length > 0;
+
+      // 상품 필드: 직접입력 불가 · 터치 시 상품목록으로 이동
+      if (f.id === "product") {
+        const valSpan = el("span");
+        const prodIcon = el("span");
+        const container = el("div", { class: "field selectable" });
+        const renderProduct = () => {
+          const v = (form.product || "");
+          const done = v.trim().length > 0;
+          container.className = "field selectable " + (done ? "done" : "");
+          valSpan.className = "field-val " + (done ? "" : "placeholder");
+          valSpan.textContent = done ? v : "상품 목록에서 선택해 주세요";
+          prodIcon.innerHTML = "";
+          prodIcon.appendChild(done ? I.Check({ size: 16, strokeWidth: 2.4 }) : f.icon({ size: 16 }));
+        };
+        container.appendChild(el("div", { class: "field-label" },
+          el("span", { class: "lbl" }, el("span", { class: "stepno" }, String(i + 2)), " " + f.label), prodIcon));
+        container.appendChild(el("button", { type: "button", class: "field-trigger", onClick: () => openProductPicker(null, (label) => { setFieldValue("product", label); showToast("상품이 선택되었어요", 1800); }) }, valSpan, I.Arrow({ size: 16 })));
+        renderProduct();
+        refs[f.id] = { container: container, render: renderProduct, icon: f.icon };
+        formEl.appendChild(container);
+        return;
+      }
+
       let rightNode, iconSlot = null;
       if (f.guide) rightNode = el("button", { type: "button", class: "field-guide-btn", onClick: () => openRibbonGuide((text) => { setFieldValue("message", text); showToast("리본문구가 입력되었어요", 1800); }) }, I.Sparkle({ size: 12, strokeWidth: 2.2 }), " 간편선택");
       else if (f.recent) rightNode = el("button", { type: "button", class: "field-guide-btn", onClick: () => openRecentSenders((text) => { setFieldValue("sender", text); showToast("보내는분이 입력되었어요", 1800); }) }, I.Clock({ size: 12, strokeWidth: 2.2 }), " 최근작성");
@@ -801,7 +912,7 @@
       if (type === "obituary") { const dt = computeInstantDelivery(); form.deliveryDate = dt.date; form.deliveryTime = dt.time; }
       else { const dt = parseISOToDateTime(data && data.ceremonyDateTime); if (dt) { form.deliveryDate = dt.date; if (dt.time) form.deliveryTime = dt.time; } }
       renderDtField(); recompute();
-      openProductPicker(type === "obituary" ? "tab5" : "tab4", (label) => { setFieldValue("product", label); showToast("상품이 선택되었어요", 1800); });
+      openProductPicker("tab4", (label) => { setFieldValue("product", label); showToast("상품이 선택되었어요", 1800); }, { groupKey: type === "obituary" ? "condol" : "congrat" });
       showToast(type === "obituary" ? "부고장 정보를 불러왔어요 · 근조화환을 선택해주세요" : "청첩장 정보를 불러왔어요 · 축하화환을 선택해주세요", 3000);
     }
 
@@ -819,9 +930,16 @@
         el("li", null, "배송완료 이후에 사진을 발송해 드려요."),
         el("li", null, "18:30 이후 주문은 익일 오전 중 배송돼요."),
         el("li", null, "일부 지역에서 배송비가 발생할 수 있어요."),
-        el("li", null, "화분의 종류는 변경될 수 있어요."))));
+        el("li", null, "결혼식 주문 시 정확한 예식 시간 지정이 필요합니다."),
+        el("li", null, "결혼식 주문 시 측근(신랑/신부) 확인이 꼭 필요합니다."))));
     root.appendChild(el("div", { class: "dock" }, el("button", { class: "btn", onClick: send }, "작성한 내용으로 신청", I.Send({ size: 18 }))));
     root.appendChild(toastHost);
+
+    // 홈에서 간편접수(정보 가져오기) 후 진입 시: 추출된 정보로 자동 채움
+    if (S.pendingIntakeData) {
+      const pd = S.pendingIntakeData; S.pendingIntakeData = null;
+      setTimeout(() => handleIntake(pd.type, pd.data), 0);
+    }
     return root;
   }
 
@@ -849,7 +967,7 @@
     renderScreen();
   }
   function openCat(tabId) { S.activeTab = tabId; go("items"); }
-  function orderProduct(it) { S.orderSeed = it.name + " (" + fmt(it.price) + "원)"; go("order"); }
+  function orderProduct(it) { S.orderSeed = seedLabel(it); go("order"); }
 
   // 신청인 모달 열기 (수정/게이트 공용)
   function openEditApplicant(fromGate) {
@@ -862,7 +980,7 @@
         if (pending) { S.route = pending; location.hash = pending; renderScreen(); }
         else if (S.route === "home") renderScreen();
       },
-      function onClose() { pendingRoute = null; }
+      function onClose() { pendingRoute = null; S.pendingIntakeData = null; }
     );
   }
 
@@ -872,7 +990,7 @@
     let exitTimer = null, raf = null, fallback = null, doneCalled = false;
     const loaderBar = el("span", { class: "splash-loader-bar", style: { width: "0%" } });
     const countdown = el("span", { class: "splash-countdown", "aria-live": "polite" }, Math.ceil(DURATION / 1000) + "초 뒤 접속됩니다");
-    const root = el("div", { class: "splash splash-intro", role: "button", tabindex: 0, "aria-label": "늘푸른바다 경조사 지원센터 시작하기" });
+    const root = el("div", { class: "splash splash-intro", role: "button", tabindex: 0, "aria-label": "하림그룹 경조화환 통합 운영 시스템 시작하기" });
     function enter() {
       if (exitTimer) return;
       root.className = "splash splash-exit";
@@ -886,8 +1004,8 @@
     root.appendChild(el("div", { class: "splash-content" },
       el("span", { class: "splash-eyebrow" }, "경조사 토탈 케어 서비스"),
       el("h1", { class: "splash-title" },
-        el("span", { class: "splash-line splash-line-1" }, el("em", null, "늘푸른바다"), " (고래사)"),
-        el("span", { class: "splash-line splash-line-2" }, "경조사 지원센터")),
+        el("span", { class: "splash-line splash-line-1" }, el("em", null, "하림그룹 경조화환")),
+        el("span", { class: "splash-line splash-line-2" }, "통합 운영 시스템")),
       el("div", { class: "splash-loader", "aria-hidden": "true" }, loaderBar),
       countdown));
     document.body.appendChild(root);

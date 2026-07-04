@@ -14,7 +14,7 @@
 //     (백엔드는 { type, url, text } 를 받아 OpenAI를 호출하고
 //      { ...추출JSON } 또는 { output_text } / { text } 를 돌려주면 됩니다.)
 // ───────────────────────────────────────────────────────────────
-window.GORAESA_AI_CONFIG = {
+window.HARIM_AI_CONFIG = {
   // 브라우저에서는 키를 두지 않습니다(노출 방지). 키는 server.js 가 keystore.json 에서 읽습니다.
   apiKey: "",
 
